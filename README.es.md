@@ -1,110 +1,79 @@
-# Plantilla de Proyecto de Ciencia de Datos
+# K-Nearest Neighbors — Clasificación de Calidad de Vino
 
-Esta plantilla está diseñada para impulsar proyectos de ciencia de datos proporcionando una configuración básica para conexiones de base de datos, procesamiento de datos, y desarrollo de modelos de aprendizaje automático. Incluye una organización estructurada de carpetas para tus conjuntos de datos y un conjunto de paquetes de Python predefinidos necesarios para la mayoría de las tareas de ciencia de datos.
+> Clasificador KNN multiclase sobre 1.599 muestras de vino tinto: escalado de características, un barrido de k de 1 a 20 para encontrar el tamaño óptimo del vecindario y una función de inferencia `predict_wine_quality()` — alcanzando el 84,4% de precisión con k=5 y llegando al máximo con k=14.
 
-## Estructura
+---
 
-El proyecto está organizado de la siguiente manera:
+## Problema
 
-- **`src/app.py`** → Script principal de Python donde correrá tu proyecto.
-- **`src/explore.ipynb`** → Notebook para exploración y pruebas. Una vez finalizada la exploración, migra el código limpio a `app.py`.
-- **`src/utils.py`** → Funciones auxiliares, como conexión a bases de datos.
-- **`requirements.txt`** → Lista de paquetes de Python necesarios.
-- **`models/`** → Contendrá tus clases de modelos SQLAlchemy.
-- **`data/`** → Almacena los datasets en diferentes etapas:
-  - **`data/raw/`** → Datos sin procesar.
-  - **`data/interim/`** → Datos transformados temporalmente.
-  - **`data/processed/`** → Datos listos para análisis.
+Predecir si un vino tinto es de calidad **baja**, **media** o **alta** basándose en 11 medidas fisicoquímicas. Los productores y distribuidores de vino quieren una señal de calidad objetiva y basada en datos que no dependa exclusivamente de catadores expertos costosos. Este es un problema de clasificación de 3 clases.
 
+## Dataset
 
-## ⚡ Configuración Inicial en Codespaces (Recomendado)
+- **Fuente:** Dataset Red Wine Quality (UCI vía GitHub)
+- **Tamaño:** 1.599 filas × 12 columnas (11 características + puntuación de calidad)
+- **Ingeniería de etiquetas de calidad:** puntuación `quality` (0–10) → 3 clases:
 
-No es necesario realizar ninguna configuración manual, ya que **Codespaces se configura automáticamente** con los archivos predefinidos que ha creado la academia para ti. Simplemente sigue estos pasos:
+| Puntuación de calidad | Etiqueta | Clase |
+|---|---|---|
+| ≤ 4 | Baja | 0 |
+| 5–6 | Media | 1 |
+| ≥ 7 | Alta | 2 |
 
-1. **Espera a que el entorno se configure automáticamente**.
-   - Todos los paquetes necesarios y la base de datos se instalarán por sí mismos.
-   - El `username` y `db_name` creados automáticamente están en el archivo **`.env`** en la raíz del proyecto.
-2. **Una vez que Codespaces esté listo, puedes comenzar a trabajar inmediatamente**.
+**Características:** acidez fija, acidez volátil, ácido cítrico, azúcar residual, cloruros, dióxido de azufre libre, dióxido de azufre total, densidad, pH, sulfatos, alcohol
 
+## Pipeline
 
-## 💻 Configuración en Local (Solo si no puedes usar Codespaces)
+| Paso | Acción |
+|---|---|
+| Ingeniería de etiquetas | Puntuaciones de calidad agrupadas en 3 clases ordinales |
+| División train/test | 80/20, random_state=42 (1.279 entrenamiento / 320 prueba) |
+| Escalado | `StandardScaler` — crítico para KNN ya que la distancia depende de la escala |
+| Modelo base | `KNeighborsClassifier(n_neighbors=5)` |
+| Optimización | Barrido k=1 a k=20, registro de precisión en cada k, selección del mejor |
+| Mejor k | **k=14** |
+| Función de inferencia | `predict_wine_quality(features)` → devuelve etiqueta legible por humanos |
 
-**Prerrequisitos**
+## Resultados del Modelo
 
-Asegúrate de tener Python 3.11+ instalado en tu máquina. También necesitarás pip para instalar los paquetes de Python.
+**Línea base k=5:**
 
-**Instalación**
+| Clase | Precisión | Recall | F1 | Soporte |
+|---|---|---|---|---|
+| Baja (0) | 0,00 | 0,00 | 0,00 | 11 |
+| Media (1) | 0,87 | 0,95 | 0,91 | 262 |
+| Alta (2) | 0,65 | 0,43 | 0,51 | 47 |
+| **Precisión global** | | | **84,4%** | 320 |
 
-Clona el repositorio del proyecto en tu máquina local.
+**Tras la optimización con barrido → k=14** mejora aún más la precisión al suavizar la frontera de decisión.
 
-Navega hasta el directorio del proyecto e instala los paquetes de Python requeridos:
+**Observación clave:** La clase 0 (calidad baja) tiene precisión y recall nulos con k=5 — solo 11 muestras de prueba la hacen prácticamente invisible durante el entrenamiento. Este es un problema de desbalance de clases, no un fallo de KNN.
+
+## Conclusiones Clave
+
+- **El escalado es obligatorio para KNN:** KNN mide la distancia entre puntos de datos. Sin StandardScaler, las características con rangos numéricos grandes (como `total sulfur dioxide` hasta 289) dominan el cálculo de distancia y oscurecen características informativas como `pH` (rango ≈ 3,0–4,0).
+- **k controla el equilibrio sesgo–varianza:** k pequeño (k=1) memoriza el ruido del entrenamiento — alta varianza. k grande promedia sobre muchos vecinos — alto sesgo, fronteras más suaves. El barrido hace este equilibrio explícito y elige el óptimo empírico.
+- **La precisión global oculta el fallo a nivel de clase:** El 84% de precisión suena sólido, pero el modelo falla completamente en los vinos de baja calidad (la clase minoritaria). Para un caso de uso en una bodega, no detectar botellas de baja calidad sería un fallo significativo en el mundo real.
+
+## Stack Tecnológico
+
+`Python` · `scikit-learn` · `pandas` · `Matplotlib`
+
+## Ejecutar Localmente
 
 ```bash
+git clone https://github.com/matthewkane-ml/ML_KNearestNeighbors_MTK.git
+cd ML_KNearestNeighbors_MTK
 pip install -r requirements.txt
+jupyter notebook src/explore.ipynb
 ```
 
-**Crear una base de datos (si es necesario)**
+## Próximos Pasos
 
-Crea una nueva base de datos dentro del motor Postgres personalizando y ejecutando el siguiente comando: 
+- Abordar el desbalance de clases con sobremuestreo **SMOTE** en el conjunto de entrenamiento para dar a la clase de baja calidad suficiente representación como para ser aprendible
+- Probar **KNN ponderado** (`weights="distance"`) para que los vecinos más cercanos tengan más influencia que los lejanos
+- Comparar con un clasificador **Random Forest** en las mismas características para cuantificar el techo de precisión alcanzable con un método no basado en distancias
 
-```bash
-$ psql -U postgres -c "DO \$\$ BEGIN 
-    CREATE USER mi_usuario WITH PASSWORD 'mi_contraseña'; 
-    CREATE DATABASE mi_base_de_datos OWNER mi_usuario; 
-END \$\$;"
-```
-Conéctate al motor Postgres para usar tu base de datos, manipular tablas y datos: 
+---
 
-```bash
-$ psql -U mi_usuario -d mi_base_de_datos
-```
-
-¡Una vez que estés dentro de PSQL podrás crear tablas, hacer consultas, insertar, actualizar o eliminar datos y mucho más!
-
-**Variables de entorno**
-
-Crea un archivo .env en el directorio raíz del proyecto para almacenar tus variables de entorno, como tu cadena de conexión a la base de datos:
-
-```makefile
-DATABASE_URL="postgresql://<USUARIO>:<CONTRASEÑA>@<HOST>:<PUERTO>/<NOMBRE_BD>"
-
-#example
-DATABASE_URL="postgresql://mi_usuario:mi_contraseña@localhost:5432/mi_base_de_datos"
-```
-
-## Ejecutando la Aplicación
-
-Para ejecutar la aplicación, ejecuta el script app.py desde la raíz del directorio del proyecto:
-
-```bash
-python src/app.py
-```
-
-## Añadiendo Modelos
-
-Para añadir clases de modelos SQLAlchemy, crea nuevos archivos de script de Python dentro del directorio models/. Estas clases deben ser definidas de acuerdo a tu esquema de base de datos.
-
-Definición del modelo de ejemplo (`models/example_model.py`):
-
-```py
-from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy import String
-from sqlalchemy.orm import Mapped, mapped_column
-
-Base = declarative_base()
-
-class ExampleModel(Base):
-    __tablename__ = 'example_table'
-    id: Mapped[int] = mapped_column(primary_key=True)
-    username: Mapped[str] = mapped_column(unique=True)
-```
-
-## Trabajando con Datos
-
-Puedes colocar tus conjuntos de datos brutos en el directorio data/raw, conjuntos de datos intermedios en data/interim, y los conjuntos de datos procesados listos para el análisis en data/processed.
-
-Para procesar datos, puedes modificar el script app.py para incluir tus pasos de procesamiento de datos, utilizando pandas para la manipulación y análisis de datos.
-
-## Contribuyentes
-
-Este proyecto es mantenido por [matthewkane-ml](https://github.com/matthewkane-ml).
+**Autor:** Matthew Kane — [LinkedIn](https://www.linkedin.com/in/thomas-k-392094410/) · [Portafolio GitHub](https://github.com/matthewkane-ml)

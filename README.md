@@ -1,110 +1,79 @@
-# Data Science Project Boilerplate
+# K-Nearest Neighbors — Wine Quality Classification
 
-This boilerplate is designed to kickstart data science projects by providing a basic setup for database connections, data processing, and machine learning model development. It includes a structured folder organization for your datasets and a set of pre-defined Python packages necessary for most data science tasks.
+> Multi-class KNN classifier on 1,599 red wine samples: chemical feature scaling, a k-sweep from 1 to 20 to find the optimal neighbourhood size, and a `predict_wine_quality()` inference function — achieving 84.4% accuracy at k=5 and peaking at k=14.
 
-## Structure
+---
 
-The project is organized as follows:
+## Problem
 
-- **`src/app.py`** → Main Python script where your project will run.
-- **`src/explore.ipynb`** → Notebook for exploration and testing. Once exploration is complete, migrate the clean code to `app.py`.
-- **`src/utils.py`** → Auxiliary functions, such as database connection.
-- **`requirements.txt`** → List of required Python packages.
-- **`models/`** → Will contain your SQLAlchemy model classes.
-- **`data/`** → Stores datasets at different stages:
-  - **`data/raw/`** → Raw data.
-  - **`data/interim/`** → Temporarily transformed data.
-  - **`data/processed/`** → Data ready for analysis.
+Predict whether a red wine is of **low**, **medium**, or **high** quality based on 11 physicochemical measurements. Winemakers and distributors want an objective, data-driven quality signal that doesn't rely purely on expensive expert tasters. This is a 3-class classification problem.
 
+## Dataset
 
-## ⚡ Initial Setup in Codespaces (Recommended)
+- **Source:** Red Wine Quality dataset (UCI via GitHub)
+- **Size:** 1,599 rows × 12 columns (11 features + quality score)
+- **Quality label engineering:** `quality` score (0–10) → 3 classes:
 
-No manual setup is required, as **Codespaces is automatically configured** with the predefined files created by the academy for you. Just follow these steps:
+| Quality score | Label | Class |
+|---|---|---|
+| ≤ 4 | Low | 0 |
+| 5–6 | Medium | 1 |
+| ≥ 7 | High | 2 |
 
-1. **Wait for the environment to configure automatically**.
-   - All necessary packages and the database will install themselves.
-   - The automatically created `username` and `db_name` are in the **`.env`** file at the root of the project.
-2. **Once Codespaces is ready, you can start working immediately**.
+**Features:** fixed acidity, volatile acidity, citric acid, residual sugar, chlorides, free sulfur dioxide, total sulfur dioxide, density, pH, sulphates, alcohol
 
+## Pipeline
 
-## 💻 Local Setup (Only if you can't use Codespaces)
+| Step | Action |
+|---|---|
+| Label engineering | Quality scores bucketed into 3 ordinal classes |
+| Train/test split | 80/20, random_state=42 (1,279 train / 320 test) |
+| Scaling | `StandardScaler` — critical for KNN since distance is scale-dependent |
+| Baseline model | `KNeighborsClassifier(n_neighbors=5)` |
+| Optimisation | Sweep k=1 to k=20, record accuracy at each k, select best |
+| Best k | **k=14** |
+| Inference function | `predict_wine_quality(features)` → returns human-readable label |
 
-**Prerequisites**
+## Model Results
 
-Make sure you have Python 3.11+ installed on your machine. You will also need pip to install the Python packages.
+**k=5 baseline:**
 
-**Installation**
+| Class | Precision | Recall | F1 | Support |
+|---|---|---|---|---|
+| Low (0) | 0.00 | 0.00 | 0.00 | 11 |
+| Medium (1) | 0.87 | 0.95 | 0.91 | 262 |
+| High (2) | 0.65 | 0.43 | 0.51 | 47 |
+| **Overall accuracy** | | | **84.4%** | 320 |
 
-Clone the project repository to your local machine.
+**After k-sweep optimisation → k=14** improves accuracy further by smoothing the decision boundary.
 
-Navigate to the project directory and install the required Python packages:
+**Key observation:** Class 0 (low quality) has zero precision and recall at k=5 — only 11 test samples make it essentially invisible during training. This is a class imbalance problem, not a KNN failure.
+
+## Key Takeaways
+
+- **Scaling is mandatory for KNN:** KNN measures distance between data points. Without StandardScaler, features with large numerical ranges (like `total sulfur dioxide` up to 289) dominate the distance calculation and drown out informative features like `pH` (range ≈ 3.0–4.0).
+- **k controls the bias–variance tradeoff:** Small k (k=1) memorises training noise — high variance. Large k averages over many neighbours — high bias, smoother boundaries. The k-sweep makes this tradeoff explicit and picks the empirical optimum.
+- **Overall accuracy hides class-level failure:** 84% accuracy sounds strong, but the model completely fails on low-quality wines (the minority class). For a winery use case, missing low-quality bottles entirely would be a significant real-world failure.
+
+## Tech Stack
+
+`Python` · `scikit-learn` · `pandas` · `Matplotlib`
+
+## Run It Locally
 
 ```bash
+git clone https://github.com/matthewkane-ml/ML_KNearestNeighbors_MTK.git
+cd ML_KNearestNeighbors_MTK
 pip install -r requirements.txt
+jupyter notebook src/explore.ipynb
 ```
 
-**Create a database (if necessary)**
+## What I'd Do Next
 
-Create a new database within the Postgres engine by customizing and executing the following command:
+- Address class imbalance with **SMOTE** oversampling on the training set to give the low-quality class enough representation to be learnable
+- Try **weighted KNN** (`weights="distance"`) so nearer neighbours have more influence than distant ones
+- Compare against a **Random Forest** classifier on the same features to quantify the accuracy ceiling achievable with a non-distance-based method
 
-```bash
-$ psql -U postgres -c "DO \$\$ BEGIN 
-    CREATE USER my_user WITH PASSWORD 'my_password'; 
-    CREATE DATABASE my_database OWNER my_user; 
-END \$\$;"
-```
-Connect to the Postgres engine to use your database, manipulate tables, and data:
+---
 
-```bash
-$ psql -U my_user -d my_database
-```
-
-Once inside PSQL, you can create tables, run queries, insert, update, or delete data, and much more!
-
-**Environment Variables**
-
-Create a .env file in the root directory of the project to store your environment variables, such as your database connection string:
-
-```makefile
-DATABASE_URL="postgresql://<USER>:<PASSWORD>@<HOST>:<PORT>/<DB_NAME>"
-
-#example
-DATABASE_URL="postgresql://my_user:my_password@localhost:5432/my_database"
-```
-
-## Running the Application
-
-To run the application, execute the app.py script from the root directory of the project:
-
-```bash
-python src/app.py
-```
-
-## Adding Models
-
-To add SQLAlchemy model classes, create new Python script files within the models/ directory. These classes should be defined according to your database schema.
-
-Example model definition (`models/example_model.py`):
-
-```py
-from sqlalchemy.orm import declarative_base
-from sqlalchemy import String
-from sqlalchemy.orm import Mapped, mapped_column
-
-Base = declarative_base()
-
-class ExampleModel(Base):
-    __tablename__ = 'example_table'
-    id: Mapped[int] = mapped_column(primary_key=True)
-    username: Mapped[str] = mapped_column(unique=True)
-```
-
-## Working with Data
-
-You can place your raw datasets in the data/raw directory, intermediate datasets in data/interim, and processed datasets ready for analysis in data/processed.
-
-To process data, you can modify the app.py script to include your data processing steps, using pandas for data manipulation and analysis.
-
-## Contributors
-
-This project is maintained by [matthewkane-ml](https://github.com/matthewkane-ml).
+**Author:** Matthew Kane — [LinkedIn](https://www.linkedin.com/in/thomas-k-392094410/) · [GitHub portfolio](https://github.com/matthewkane-ml)
